@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#123b5d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="NAHA練習ログ">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>NAHAマラソン練習ログ</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --text:#17202a; --muted:#687582; --line:#dce2e8; --accent:#1769aa; --done:#e7f5eb; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif; line-height:1.45; }
+  header { padding:22px 16px 16px; background:#123b5d; color:white; }
+  header h1 { font-size:1.35rem; margin:0 0 6px; }
+  header p { margin:0; font-size:.9rem; opacity:.9; }
+  main { max-width:760px; margin:0 auto; padding:14px 12px 36px; }
+  .notice { background:#fff8e7; border:1px solid #f0d99b; border-radius:12px; padding:12px; margin-bottom:14px; font-size:.9rem; }
+  .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+  .metric { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 8px; text-align:center; }
+  .metric strong { display:block; font-size:1.35rem; }
+  .metric span { color:var(--muted); font-size:.78rem; }
+  .week-title { margin:22px 2px 8px; font-size:1rem; }
+  .workout { background:var(--card); border:1px solid var(--line); border-radius:14px; margin-bottom:10px; padding:13px; }
+  .workout.completed { background:var(--done); border-color:#9ccfac; }
+  .top { display:flex; align-items:flex-start; gap:10px; }
+  .top input[type=checkbox] { width:22px; height:22px; margin:2px 0 0; flex-shrink:0; accent-color:#16803c; }
+  .main-info { flex:1; min-width:0; }
+  .date { font-weight:700; }
+  .type { color:var(--muted); font-size:.82rem; margin-left:6px; }
+  .plan { margin-top:4px; font-size:.92rem; }
+  .status { color:var(--muted); font-size:.8rem; margin-top:4px; }
+  .fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+  label { display:block; color:var(--muted); font-size:.76rem; }
+  input[type=number], input[type=text], textarea, select { width:100%; margin-top:4px; border:1px solid #cbd4dc; border-radius:8px; background:white; color:var(--text); padding:9px 8px; font:inherit; font-size:.95rem; }
+  textarea { min-height:58px; resize:vertical; }
+  .notes { margin-top:9px; }
+  .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0; }
+  button { border:0; border-radius:10px; padding:12px 10px; font:inherit; font-weight:650; background:var(--accent); color:white; }
+  button.secondary { background:#e4e9ee; color:#17202a; }
+  button.danger { background:#fff; color:#a12626; border:1px solid #e0b7b7; }
+  .footer { font-size:.8rem; color:var(--muted); padding:8px 2px; }
+  @media (max-width:420px) { .fields { grid-template-columns:1fr 1fr; } .fields label:last-child { grid-column:1/-1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>NAHAマラソン 練習チェックログ</h1>
+  <p>目標：2026年12月6日 完走｜体調を優先して調整</p>
+</header>
+<main>
+  <div class="notice"><strong>ふくらはぎの張りがある場合：</strong>走ると張る状態では試走せず、歩行・階段で痛みがなく、張りがほぼ解消してから短い走歩併用で再開してください。張りが悪化したら中止。</div>
+  <section class="summary" aria-label="進捗">
+    <div class="metric"><strong id="doneCount">0</strong><span>完了メニュー</span></div>
+    <div class="metric"><strong id="totalKm">0 km</strong><span>実績距離の合計</span></div>
+    <div class="metric"><strong id="progress">0%</strong><span>完了率</span></div>
+  </section>
+  <div id="schedule"></div>
+  <div class="actions">
+    <button id="exportBtn">CSVを書き出す</button>
+    <button class="secondary" id="saveBtn">入力内容を保存</button>
+    <button class="secondary" id="importBtn">CSVを読み込む</button>
+    <button class="danger" id="resetBtn">全ログをリセット</button>
+  </div>
+  <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
+  <p class="footer">入力はこのページのブラウザー内に保存されます。CSVを書き出して定期的にバックアップしてください。iPhoneの「ショートカット」内のプレビューでは保存機能が制限されることがあるため、保存が残らない場合はSafariでこのHTMLを開いてください。</p>
+</main>
+<script>
+const workouts = [
+ {week:"第1週｜10/19〜10/25：回復優先",items:[
+  ["2026-10-19","月","休養","ランニング休止。痛みのない範囲で軽く足首を動かす。"],
+  ["2026-10-20","火","回復チェック","散歩程度。走ると張るならランニングはしない。"],
+  ["2026-10-21","水","再評価","歩行・階段・軽いつま先立ちで痛みがなく、張りがほぼ消えているか確認。"],
+  ["2026-10-22","木","条件付き試走","症状がほぼ解消している場合のみ、1分走る＋2分歩くを合計15分程度。張りが出たら中止。"],
+  ["2026-10-23","金","休養・確認","試走後や翌朝に張りが戻っていないか確認。"],
+  ["2026-10-24","土","条件付きラン","試走後も症状がなければ20〜25分の軽い走歩併用。"],
+  ["2026-10-25","日","休養","休養または痛みのない範囲の散歩。"]
+ ]},
+ {week:"第2週｜10/26〜11/1：再開",items:[
+  ["2026-10-27","火","ランニング","3〜4 km、会話できるペース。張りが再発したら中止。"],
+  ["2026-10-29","木","ランニング","4 km、ゆっくり。前回の翌朝に症状がなかった場合のみ。"],
+  ["2026-10-31","土","長めの練習","5〜7 kmを目安。体調により短縮。"]
+ ]},
+ {week:"第3週｜11/2〜11/8：段階的に増やす",items:[
+  ["2026-11-03","火","ランニング","4 km、ゆっくり。"],
+  ["2026-11-05","木","ランニング","4〜5 km、ゆっくり。"],
+  ["2026-11-07","土","長めの練習","7〜9 kmを目安。"]
+ ]},
+ {week:"第4週｜11/9〜11/15：持久力",items:[
+  ["2026-11-10","火","ランニング","4〜5 km。"],
+  ["2026-11-12","木","ランニング","5 km。"],
+  ["2026-11-14","土","長めの練習","8〜10 kmを検討。症状が出るなら短縮・中止。"]
+ ]},
+ {week:"第5週｜11/16〜11/22：無理のない長距離",items:[
+  ["2026-11-17","火","ランニング","4 km。"],
+  ["2026-11-19","木","ランニング","4〜5 km。"],
+  ["2026-11-21","土","長めの練習","10〜12 kmは、ここまで問題なく走れた場合のみ検討。"]
+ ]},
+ {week:"第6週｜11/23〜11/29：疲労を残さない",items:[
+  ["2026-11-24","火","ランニング","3〜4 km。"],
+  ["2026-11-26","木","ランニング","3〜4 km。"],
+  ["2026-11-28","土","長めの練習","6〜8 kmを目安。距離を追わない。"]
+ ]},
+ {week:"第7週｜11/30〜12/6：本番週",items:[
+  ["2026-12-01","火","軽いランニング","2〜3 km、疲労を残さない。"],
+  ["2026-12-03","木","軽いランニング","2 km程度。張りがあれば休む。"],
+  ["2026-12-04","金","休養","睡眠と体調を優先。"],
+  ["2026-12-05","土","休養","軽い散歩程度。"],
+  ["2026-12-06","日","NAHAマラソン本番","症状と体調を優先。無理な走行はしない。"]
+ ]}
+];
+const KEY = "nahaTrainingLog2026_v1";
+let log = {};
+function keyOf(w){ return w[0]; }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function load(){ try { log = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch(e) { log = {}; } }
+function persist(){ try { localStorage.setItem(KEY, JSON.stringify(log)); } catch(e) {} updateSummary(); }
+function render(){
+ const root = document.getElementById("schedule");
+ root.innerHTML = "";
+ workouts.forEach(group=>{
+   const h = document.createElement("h2"); h.className="week-title"; h.textContent=group.week; root.appendChild(h);
+   group.items.forEach(w=>{
+    const k=keyOf(w), d=log[k]||{};
+    const card=document.createElement("section"); card.className="workout"+(d.done?" completed":""); card.dataset.date=k;
+    const date=new Date(k+"T12:00:00"); const dateText=`${date.getMonth()+1}/${date.getDate()}（${["日","月","火","水","木","金","土"][date.getDay()]}）`;
+    card.innerHTML=`
+      <div class="top">
+        <input type="checkbox" class="done" aria-label="完了" ${d.done?"checked":""}>
+        <div class="main-info">
+          <div><span class="date">${dateText}</span><span class="type">${esc(w[2])}</span></div>
+          <div class="plan">${esc(w[3])}</div>
+          <div class="status">${d.done?"✓ 完了":"未完了"}</div>
+        </div>
+      </div>
+      <div class="fields">
+        <label>実績距離（km）<input type="number" min="0" max="100" step="0.1" class="distance" inputmode="decimal" placeholder="例 4.0" value="${esc(d.distance||"")}"></label>
+        <label>時間（分）<input type="number" min="0" max="1000" step="1" class="minutes" inputmode="numeric" placeholder="例 36" value="${esc(d.minutes||"")}"></label>
+        <label>体重（kg）<input type="number" min="0" max="300" step="0.1" class="weight" inputmode="decimal" placeholder="例 78.0" value="${esc(d.weight||"")}"></label>
+      </div>
+      <label class="notes">体調・メモ<textarea class="note" placeholder="例：ふくらはぎ張りなし、体が軽い">${esc(d.note||"")}</textarea></label>`;
+    const saveCard=()=>{
+      const current=log[k]||{};
+      current.done=card.querySelector(".done").checked;
+      current.distance=card.querySelector(".distance").value;
+      current.minutes=card.querySelector(".minutes").value;
+      current.weight=card.querySelector(".weight").value;
+      current.note=card.querySelector(".note").value;
+      log[k]=current; card.classList.toggle("completed",current.done);
+      card.querySelector(".status").textContent=current.done?"✓ 完了":"未完了";
+      persist();
+    };
+    card.querySelectorAll("input,textarea").forEach(el=>el.addEventListener("change",saveCard));
+    card.querySelector(".note").addEventListener("input",saveCard);
+    root.appendChild(card);
+   });
+ });
+ updateSummary();
+}
+function updateSummary(){
+ const all=workouts.flatMap(g=>g.items), done=all.filter(w=>log[keyOf(w)]?.done).length;
+ const km=all.reduce((s,w)=>s+(parseFloat(log[keyOf(w)]?.distance)||0),0);
+ document.getElementById("doneCount").textContent=`${done}/${all.length}`;
+ document.getElementById("totalKm").textContent=`${Math.round(km*10)/10} km`;
+ document.getElementById("progress").textContent=`${Math.round(done/all.length*100)}%`;
+}
+function csvEscape(v){ return '"'+String(v??"").replace(/"/g,'""')+'"'; }
+function exportCSV(){
+ const rows=[["日付","予定","内容","完了","実績距離_km","時間_分","体重_kg","体調・メモ"]];
+ workouts.flatMap(g=>g.items).forEach(w=>{
+  const d=log[keyOf(w)]||{};
+  rows.push([w[0],w[2],w[3],d.done?"はい":"いいえ",d.distance||"",d.minutes||"",d.weight||"",d.note||""]);
+ });
+ const csv="\uFEFF"+rows.map(r=>r.map(csvEscape).join(",")).join("\r\n");
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+ const url=URL.createObjectURL(blob), a=document.createElement("a");
+ a.href=url; a.download="naha_training_log.csv"; a.click(); URL.revokeObjectURL(url);
+}
+document.getElementById("exportBtn").addEventListener("click",exportCSV);
+document.getElementById("saveBtn").addEventListener("click",()=>{persist(); alert("このブラウザー内に保存しました。CSVでもバックアップしてください。");});
+document.getElementById("resetBtn").addEventListener("click",()=>{
+ if(confirm("すべての入力ログを削除します。この操作は取り消せません。")){log={};persist();render();}
+});
+document.getElementById("importBtn").addEventListener("click",()=>document.getElementById("csvFile").click());
+document.getElementById("csvFile").addEventListener("change",async e=>{
+ const f=e.target.files[0]; if(!f)return;
+ try{
+  const txt=(await f.text()).replace(/^\uFEFF/,"");
+  const lines=txt.split(/\r?\n/).filter(Boolean);
+  const parseLine=line=>{const out=[];let cur="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'&&line[i+1]==='"'&&q){cur+='"';i++;}else if(c==='"')q=!q;else if(c===","&&!q){out.push(cur);cur="";}else cur+=c;}out.push(cur);return out;};
+  lines.slice(1).forEach(line=>{const r=parseLine(line);if(!r[0])return;log[r[0]]={done:r[3]==="はい",distance:r[4]||"",minutes:r[5]||"",weight:r[6]||"",note:r[7]||""};});
+  persist();render();alert("CSVを読み込みました。");
+ }catch(err){alert("CSVを読み込めませんでした。");}
+ e.target.value="";
+});
+load(); render();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
